@@ -1,6 +1,25 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+This is a [Next.js](https://nextjs.org) Todo application with [Supabase](https://supabase.com) integration.
 
 ## Getting Started
+
+### 1. Environment Setup
+
+Copy the example environment file:
+
+```bash
+cp .env.local.example .env.local
+```
+
+Add your Supabase credentials to `.env.local`:
+
+```
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
+
+Get these values from your Supabase project settings.
+
+### 2. Run the Development Server
 
 First, run the development server:
 
@@ -16,15 +35,31 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Project Structure
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- `/app` - Next.js App Router pages and components
+- `/app/components/TodoList.tsx` - Main Todo list component with Supabase integration
+- `/lib/supabase.ts` - Supabase client configuration
+- `.env.local.example` - Environment variables template
+
+## Features
+
+- ✅ Create, read, update, and delete todos
+- 🎨 Built with Tailwind CSS for responsive design
+- 🗄️ Supabase backend integration (ready to connect to database)
+- ⚡ TypeScript support
+
+- ✅ Create, read, update, and delete todos
+- 🎨 Built with Tailwind CSS for responsive design
+- 🗄️ Supabase backend integration (ready to connect to database)
+- ⚡ TypeScript support
 
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:
 
 - [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Supabase Documentation](https://supabase.com/docs) - learn about Supabase backend.
 - [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
 
 You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
