@@ -1,363 +1,631 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
+import { Plus, Trash2, Check, Loader, Tag, LogOut, User, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { useAuth } from '@/lib/useAuth';
-
-interface Todo {
-  id: number;
-  user_id?: string;
-  task: string;
-  is_complete: boolean;
-}
 
 export default function TodoList() {
-  const { user, signOut } = useAuth();
-  const [todos, setTodos] = useState<Todo[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loginMode, setLoginMode] = useState('login');
+  const [todos, setTodos] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [input, setInput] = useState('');
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [editingText, setEditingText] = useState('');
-  const [activeTab, setActiveTab] = useState<'active' | 'completed'>('active');
+  const [categoryInput, setCategoryInput] = useState('');
+  const [filterCategory, setFilterCategory] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
-  // Fetch todos from Supabase
-  const fetchTodos = async () => {
-    if (!user) return;
+  useEffect(() => {
+    checkUser();
+    subscribeToAuthChanges();
+  }, []);
 
+  useEffect(() => {
+    if (currentUser) {
+      loadUserData();
+    }
+  }, [currentUser]);
+
+  const checkUser = async () => {
     try {
       setLoading(true);
-      setError(null);
-      
-      const { data, error: supabaseError } = await supabase
-        .from('todos')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('id', { ascending: true });
-
-      if (supabaseError) {
-        throw supabaseError;
-      }
-
-      // If no data from Supabase, use default todos
-      if (data && data.length > 0) {
-        setTodos(data);
-      } else {
-        const defaultTodos: Todo[] = [
-          { id: 1, task: 'Set up Next.js project', is_complete: true },
-          { id: 2, task: 'Configure TypeScript', is_complete: true },
-          { id: 3, task: 'Create page components', is_complete: false },
-          { id: 4, task: 'Set up API routes', is_complete: false },
-          { id: 5, task: 'Implement routing', is_complete: false },
-          { id: 6, task: 'Add styling with Tailwind CSS', is_complete: false },
-          { id: 7, task: 'Deploy to Vercel', is_complete: false },
-        ];
-        setTodos(defaultTodos);
-      }
-    } catch (err) {
-      console.error('Error fetching todos:', err);
-      setError('Failed to load todos. Using default todos.');
-      // Fallback to default todos on error
-      const defaultTodos: Todo[] = [
-        { id: 1, task: 'Set up Next.js project', is_complete: true },
-        { id: 2, task: 'Configure TypeScript', is_complete: true },
-        { id: 3, task: 'Create page components', is_complete: false },
-        { id: 4, task: 'Set up API routes', is_complete: false },
-        { id: 5, task: 'Implement routing', is_complete: false },
-        { id: 6, task: 'Add styling with Tailwind CSS', is_complete: false },
-        { id: 7, task: 'Deploy to Vercel', is_complete: false },
-      ];
-      setTodos(defaultTodos);
+      const { data: { user } } = await supabase.auth.getUser();
+      setCurrentUser(user);
+    } catch (error) {
+      console.log('No user logged in');
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchTodos();
-  }, [user]);
+  const subscribeToAuthChanges = () => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      setCurrentUser(session?.user || null);
+    });
+    return () => subscription?.unsubscribe();
+  };
 
-  const addTodo = async () => {
-    if (input.trim().length <= 3) {
-      setError('Task must be more than 3 characters');
-      return;
-    }
-
-    if (!user) {
-      setError('User not authenticated');
-      return;
-    }
-
-    const newTodo: Todo = {
-      id: Date.now(),
-      user_id: user.id,
-      task: input,
-      is_complete: false,
-    };
-
-    // Update local state first for immediate UI feedback
-    setTodos([...todos, newTodo]);
-    setInput('');
-
-    // Try to insert into Supabase
+  const loadUserData = async () => {
     try {
-      const { error } = await supabase
-        .from('todos')
-        .insert([{ task: newTodo.task, is_complete: newTodo.is_complete, user_id: user.id }]);
+      setLoading(true);
 
-      if (error) {
-        console.error('Error inserting todo:', error);
-        setError('Failed to save todo. It may only exist locally.');
-      }
-    } catch (err) {
-      console.error('Error inserting todo:', err);
-      setError('Failed to save todo. It may only exist locally.');
+      // Load categories
+      const { data: categoriesData, error: categoriesError } = await supabase
+        .from('categories')
+        .select('*')
+        .eq('user_id', currentUser.id);
+
+      if (categoriesError) throw categoriesError;
+      setCategories(categoriesData || []);
+
+      // Load todos
+      const { data: todosData, error: todosError } = await supabase
+        .from('todos')
+        .select('*')
+        .eq('user_id', currentUser.id)
+        .order('created_at', { ascending: false });
+
+      if (todosError) throw todosError;
+      setTodos(todosData || []);
+    } catch (error) {
+      console.error('Error loading user data:', error);
+      setError('Failed to load todos');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const toggleTodo = async (id: number) => {
-    const todo = todos.find((t) => t.id === id);
-    if (!todo) return;
+  const handleAuth = async () => {
+    if (!email.trim() || !password.trim()) {
+      setError('Please enter email and password');
+      return;
+    }
 
-    const updatedTodo = { ...todo, is_complete: !todo.is_complete };
-
-    // Update local state first
-    setTodos(
-      todos.map((t) =>
-        t.id === id ? updatedTodo : t
-      )
-    );
-
-    // Try to update in Supabase
     try {
+      setLoading(true);
+      setError('');
+
+      if (loginMode === 'signup') {
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+        });
+        if (error) throw error;
+        setEmail('');
+        setPassword('');
+        alert('Sign up successful! Please check your email to confirm.');
+      } else {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (error) throw error;
+        setEmail('');
+        setPassword('');
+      }
+    } catch (error) {
+      console.error('Auth error:', error);
+      setError(error.message || 'Authentication failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      setCurrentUser(null);
+      setTodos([]);
+      setCategories([]);
+      setFilterCategory(null);
+      setEmail('');
+      setPassword('');
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+  };
+
+  // INSERT INTO todos
+  const addTodo = async () => {
+    if (!input.trim()) return;
+
+    try {
+      setSaving(true);
+      let categoryId = null;
+
+      // Handle category
+      if (categoryInput.trim().length > 0) {
+        let category = categories.find(
+          cat => cat.name.toLowerCase() === categoryInput.trim().toLowerCase()
+        );
+
+        if (!category) {
+          const colors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-pink-500', 'bg-yellow-500', 'bg-red-500'];
+          const { data: newCategory, error: categoryError } = await supabase
+            .from('categories')
+            .insert([{
+              name: categoryInput.trim(),
+              color: colors[Math.floor(Math.random() * colors.length)],
+              user_id: currentUser.id,
+            }])
+            .select()
+            .single();
+
+          if (categoryError) throw categoryError;
+          setCategories([...categories, newCategory]);
+          categoryId = newCategory.id;
+        } else {
+          categoryId = category.id;
+        }
+      }
+
+      const { data: newTodo, error } = await supabase
+        .from('todos')
+        .insert([{
+          task: input,
+          is_complete: false,
+          status: 'not_started',
+          category_id: categoryId,
+          user_id: currentUser.id,
+        }])
+        .select()
+        .single();
+
+      if (error) throw error;
+      setTodos([newTodo, ...todos]);
+      setInput('');
+      setCategoryInput('');
+    } catch (error) {
+      console.error('Error adding todo:', error);
+      setError('Failed to add todo');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const cycleStatus = async (id) => {
+    try {
+      const todo = todos.find(t => t.id === id);
+      const statusCycle = { 'not_started': 'in_progress', 'in_progress': 'completed', 'completed': 'not_started' };
+      const newStatus = statusCycle[todo.status || 'not_started'];
+      const newCompleted = newStatus === 'completed';
+
       const { error } = await supabase
         .from('todos')
-        .update({ is_complete: updatedTodo.is_complete })
+        .update({
+          status: newStatus,
+          is_complete: newCompleted,
+          updated_at: new Date().toISOString(),
+        })
         .eq('id', id);
 
-      if (error) {
-        console.error('Error updating todo:', error);
-        setError('Failed to update todo. Changes may be local only.');
-      }
-    } catch (err) {
-      console.error('Error updating todo:', err);
-      setError('Failed to update todo. Changes may be local only.');
+      if (error) throw error;
+      setTodos(todos.map(t => t.id === id ? { ...t, status: newStatus, is_complete: newCompleted } : t));
+    } catch (error) {
+      console.error('Error updating todo:', error);
+      setError('Failed to update todo');
     }
   };
 
-  const deleteTodo = async (id: number) => {
-    // Update local state first
-    setTodos(todos.filter((todo) => todo.id !== id));
-
-    // Try to delete from Supabase
+  const deleteTodo = async (id) => {
     try {
+      setSaving(true);
       const { error } = await supabase
         .from('todos')
         .delete()
         .eq('id', id);
 
-      if (error) {
-        console.error('Error deleting todo:', error);
-        setError('Failed to delete todo. It may still exist on server.');
-      }
-    } catch (err) {
-      console.error('Error deleting todo:', err);
-      setError('Failed to delete todo. It may still exist on server.');
+      if (error) throw error;
+      setTodos(todos.filter(t => t.id !== id));
+      cleanupEmptyCategories(todos.filter(t => t.id !== id));
+    } catch (error) {
+      console.error('Error deleting todo:', error);
+      setError('Failed to delete todo');
+    } finally {
+      setSaving(false);
     }
   };
 
-  const startEditing = (id: number, currentText: string) => {
-    setEditingId(id);
-    setEditingText(currentText);
-  };
-
-  const saveEdit = async (id: number) => {
-    if (editingText.trim().length <= 3) {
-      setError('Task must be more than 3 characters');
-      return;
-    }
-
-    // Update local state
-    setTodos(
-      todos.map((t) =>
-        t.id === id ? { ...t, task: editingText } : t
-      )
-    );
-    setEditingId(null);
-
-    // Try to update in Supabase
+  const clearCompleted = async () => {
     try {
+      setSaving(true);
       const { error } = await supabase
         .from('todos')
-        .update({ task: editingText })
-        .eq('id', id);
+        .delete()
+        .eq('user_id', currentUser.id)
+        .eq('is_complete', true);
 
-      if (error) {
-        console.error('Error updating task:', error);
-        setError('Failed to update task.');
-      }
-    } catch (err) {
-      console.error('Error updating task:', err);
-      setError('Failed to update task.');
+      if (error) throw error;
+      const updated = todos.filter(t => !t.is_complete);
+      setTodos(updated);
+      cleanupEmptyCategories(updated);
+    } catch (error) {
+      console.error('Error clearing completed:', error);
+      setError('Failed to clear completed');
+    } finally {
+      setSaving(false);
     }
   };
 
-  const cancelEdit = () => {
-    setEditingId(null);
-    setEditingText('');
+  const deleteCategory = async (categoryId) => {
+    if (!confirm('Delete this category? Todos will become uncategorized.')) return;
+
+    try {
+      setSaving(true);
+
+      // Update todos to remove category
+      const { error: updateError } = await supabase
+        .from('todos')
+        .update({ category_id: null })
+        .eq('category_id', categoryId);
+
+      if (updateError) throw updateError;
+
+      // Delete category
+      const { error: deleteError } = await supabase
+        .from('categories')
+        .delete()
+        .eq('id', categoryId);
+
+      if (deleteError) throw deleteError;
+
+      setCategories(categories.filter(c => c.id !== categoryId));
+      setTodos(todos.map(t => t.category_id === categoryId ? { ...t, category_id: null } : t));
+      if (filterCategory === categoryId) setFilterCategory(null);
+    } catch (error) {
+      console.error('Error deleting category:', error);
+      setError('Failed to delete category');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  // Get filtered todos based on active tab
-  const filteredTodos = todos.filter((todo) =>
-    activeTab === 'active' ? !todo.is_complete : todo.is_complete
-  );
+  const cleanupEmptyCategories = (currentTodos) => {
+    const categoriesWithTodos = new Set(currentTodos.map(t => t.category_id).filter(id => id !== null));
+    const emptyCategories = categories.filter(cat => !categoriesWithTodos.has(cat.id));
 
-  return (
-    <>
-      {/* Sign Out Button and User Info - Fixed position top right */}
-      <div className="fixed top-3 right-3 sm:top-4 sm:right-4 z-50">
-        <div className="text-right mb-2">
-          <p className="text-xs sm:text-sm text-gray-700 font-medium break-words max-w-32 sm:max-w-48">
-            {user?.email && `${user.email}`}
-          </p>
-        </div>
-        <button
-          onClick={signOut}
-          className="px-3 py-1.5 text-xs sm:text-sm bg-red-500 text-white rounded-lg hover:bg-red-600 shadow-lg w-full"
-        >
-          Sign Out
-        </button>
-      </div>
+    if (emptyCategories.length > 0) {
+      const updatedCategories = categories.filter(cat => categoriesWithTodos.has(cat.id));
+      setCategories(updatedCategories);
 
-      <div className="w-full max-w-md px-4">
-        <div className="mb-4">
-          <h2 className="text-sm sm:text-lg font-semibold text-gray-800">
-            My Tasks
-          </h2>
-        </div>
+      if (emptyCategories.some(cat => cat.id === filterCategory)) {
+        setFilterCategory(null);
+      }
+    }
+  };
 
-        {loading && <p className="text-center text-gray-500 mb-4 text-sm">Loading todos...</p>}
-      
-      {error && (
-        <div className="mb-4 p-2 sm:p-3 bg-yellow-50 border border-yellow-300 rounded-lg">
-          <p className="text-xs sm:text-sm text-yellow-800">{error}</p>
-        </div>
-      )}
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      if (!currentUser) {
+        handleAuth();
+      } else {
+        addTodo();
+      }
+    }
+  };
 
-      {/* Tabs */}
-      <div className="flex gap-2 mb-4 border-b border-gray-200">
-        <button
-          onClick={() => setActiveTab('active')}
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition ${
-            activeTab === 'active'
-              ? 'border-blue-500 text-blue-600'
-              : 'border-transparent text-gray-600 hover:text-gray-800'
-          }`}
-        >
-          Active ({todos.filter((t) => !t.is_complete).length})
-        </button>
-        <button
-          onClick={() => setActiveTab('completed')}
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition ${
-            activeTab === 'completed'
-              ? 'border-blue-500 text-blue-600'
-              : 'border-transparent text-gray-600 hover:text-gray-800'
-          }`}
-        >
-          Completed ({todos.filter((t) => t.is_complete).length})
-        </button>
-      </div>
+  const getCategoryForTodo = (categoryId) => {
+    return categories.find(cat => cat.id === categoryId);
+  };
 
-      <div className="flex gap-2 mb-6">
-        <input
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyPress={(e) => e.key === 'Enter' && addTodo()}
-          placeholder="Add a new todo..."
-          className="flex-1 px-3 py-2.5 sm:px-4 sm:py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-black text-sm"
-        />
-        <button
-          onClick={addTodo}
-          className="px-4 sm:px-5 py-2.5 sm:py-2 bg-blue-500 text-white text-sm sm:text-base rounded-lg hover:bg-blue-600 font-medium"
-        >
-          Add
-        </button>
-      </div>
+  // SQL-like aggregate queries
+  const activeTodos = todos.filter(t => !t.is_complete).length;
+  const completedTodos = todos.filter(t => t.is_complete).length;
+  const todosByCategory = (categoryId) => todos.filter(t => t.category_id === categoryId).length;
+  
+  const getStatusCounts = (categoryId) => {
+    const categoryTodos = categoryId ? todos.filter(t => t.category_id === categoryId) : todos;
+    return {
+      not_started: categoryTodos.filter(t => (t.status || 'not_started') === 'not_started').length,
+      in_progress: categoryTodos.filter(t => t.status === 'in_progress').length,
+      completed: categoryTodos.filter(t => (t.status === 'completed' || t.is_complete)).length
+    };
+  };
+  
+  // Filter todos based on selected category
+  const filteredTodos = filterCategory === 'uncategorized'
+    ? todos.filter(t => t.category_id === null)
+    : filterCategory 
+    ? todos.filter(t => t.category_id === filterCategory)
+    : todos;
 
-      <div className="space-y-2">
-        {filteredTodos.length === 0 ? (
-          <p className="text-center text-gray-500 py-8 text-sm">
-            {activeTab === 'active'
-              ? 'No active tasks. Great job! 🎉'
-              : 'No completed tasks yet'}
-          </p>
-        ) : (
-          filteredTodos.map((todo) => (
-          <div
-            key={todo.id}
-            className="flex items-center gap-2.5 sm:gap-3 p-2.5 sm:p-3 bg-gray-50 rounded-lg hover:bg-gray-100"
-          >
+  // Login/Signup Screen
+  if (!currentUser) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-8">
+        <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
+          <div className="text-center mb-8">
+            <div className="bg-indigo-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+              <User size={32} className="text-indigo-600" />
+            </div>
+            <h1 className="text-3xl font-bold text-gray-800 mb-2">Todo List</h1>
+            <p className="text-gray-500">PostgreSQL-Style User System</p>
+          </div>
+
+          <div className="mb-6">
+            <div className="flex gap-2 mb-4">
+              <button
+                onClick={() => setLoginMode('login')}
+                className={`flex-1 py-2 rounded-lg font-medium transition-colors ${
+                  loginMode === 'login'
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                Login
+              </button>
+              <button
+                onClick={() => setLoginMode('signup')}
+                className={`flex-1 py-2 rounded-lg font-medium transition-colors ${
+                  loginMode === 'signup'
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                Sign Up
+              </button>
+            </div>
+
+            {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
+
             <input
-              type="checkbox"
-              checked={todo.is_complete}
-              onChange={() => toggleTodo(todo.id)}
-              className="w-5 h-5 min-w-5 text-blue-500 rounded cursor-pointer"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Enter your email"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-3 text-black"
+              disabled={loading}
             />
 
-            {editingId === todo.id ? (
-              <div className="flex-1 flex gap-2">
-                <input
-                  type="text"
-                  value={editingText}
-                  onChange={(e) => setEditingText(e.target.value)}
-                  className="flex-1 px-2 py-1 text-sm border border-blue-500 rounded text-black focus:outline-none"
-                  autoFocus
-                />
-                <button
-                  onClick={() => saveEdit(todo.id)}
-                  className="px-2 py-1 bg-green-500 text-white text-xs rounded hover:bg-green-600"
-                >
-                  Save
-                </button>
-                <button
-                  onClick={cancelEdit}
-                  className="px-2 py-1 bg-gray-400 text-white text-xs rounded hover:bg-gray-500"
-                >
-                  Cancel
-                </button>
-              </div>
-            ) : (
-              <>
-                <span
-                  onClick={() => startEditing(todo.id, todo.task)}
-                  className={`flex-1 text-sm sm:text-base break-words cursor-pointer hover:bg-gray-200 px-2 py-1 rounded transition ${
-                    todo.is_complete
-                      ? 'line-through text-gray-400'
-                      : 'text-gray-800'
-                  }`}
-                >
-                  {todo.task}
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              onKeyPress={handleKeyPress}
+              placeholder="Enter your password"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-4 text-black"
+              disabled={loading}
+            />
+
+            <button
+              onClick={handleAuth}
+              disabled={loading || !email.trim() || !password.trim()}
+              className="w-full bg-indigo-600 text-white py-3 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {loading ? (
+                <>
+                  <Loader className="animate-spin" size={20} />
+                  Processing...
+                </>
+              ) : (
+                loginMode === 'login' ? 'Login' : 'Sign Up'
+              )}
+            </button>
+          </div>
+
+          <p className="text-xs text-gray-400 text-center">
+            Powered by Supabase PostgreSQL
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Main Todo App (User is logged in)
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center">
+          <Loader className="animate-spin text-indigo-600 mx-auto mb-2" size={32} />
+          <p className="text-gray-600">Loading from database...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-8">
+      <div className="max-w-2xl mx-auto">
+        <div className="bg-white rounded-2xl shadow-xl p-8">
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-800">My Todo List</h1>
+              <p className="text-sm text-gray-500 flex items-center gap-2 mt-1">
+                <User size={14} />
+                Logged in as <span className="font-medium">{currentUser.email}</span>
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              {saving && (
+                <span className="text-sm text-gray-500 flex items-center gap-1">
+                  <Loader className="animate-spin" size={14} />
+                  Saving...
                 </span>
-                <button
-                  onClick={() => deleteTodo(todo.id)}
-                  className="text-red-500 hover:text-red-700 font-bold text-lg min-w-8 flex items-center justify-center"
-                >
-                  ×
-                </button>
-              </>
+              )}
+              <button
+                onClick={handleLogout}
+                className="text-gray-500 hover:text-gray-700 transition-colors flex items-center gap-2 px-3 py-2 hover:bg-gray-100 rounded-lg"
+              >
+                <LogOut size={18} />
+                Logout
+              </button>
+            </div>
+          </div>
+          <p className="text-gray-500 mb-6">
+            {activeTodos} active • {completedTodos} completed
+          </p>
+
+          {/* Categories Display - Simulating JOIN query */}
+          <div className="mb-4 flex gap-2 flex-wrap">
+            <button
+              onClick={() => setFilterCategory(null)}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all ${
+                filterCategory === null
+                  ? 'bg-indigo-600 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              All ({todos.length})
+            </button>
+            <button
+              onClick={() => setFilterCategory('uncategorized')}
+              className={`flex flex-col items-start px-3 py-1.5 rounded-lg text-sm transition-all ${
+                filterCategory === 'uncategorized'
+                  ? 'bg-indigo-600 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <span className={`w-2 h-2 rounded-full ${
+                  filterCategory === 'uncategorized' ? 'bg-white' : 'bg-gray-400'
+                }`}></span>
+                <span>Uncategorized</span>
+              </div>
+              <span className={`text-xs mt-0.5 ${filterCategory === 'uncategorized' ? 'text-indigo-100' : 'text-gray-500'}`}>
+                🔵 {getStatusCounts(null).not_started} 🟡 {getStatusCounts(null).in_progress} 🟢 {getStatusCounts(null).completed}
+              </span>
+            </button>
+            {categories.map(category => {
+              const counts = getStatusCounts(category.id);
+              return (
+                <div key={category.id} className="relative group">
+                  <button
+                    onClick={() => setFilterCategory(category.id)}
+                    className={`flex flex-col items-start px-3 py-1.5 rounded-lg text-sm transition-all ${
+                      filterCategory === category.id
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className={`w-2 h-2 rounded-full ${
+                        filterCategory === category.id ? 'bg-white' : category.color
+                      }`}></span>
+                      <span>{category.name}</span>
+                    </div>
+                    <span className={`text-xs mt-0.5 ${filterCategory === category.id ? 'text-indigo-100' : 'text-gray-500'}`}>
+                      🔵 {counts.not_started} 🟡 {counts.in_progress} 🟢 {counts.completed}
+                    </span>
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteCategory(category.id);
+                    }}
+                    className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                    title="Delete category"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+          
+          <div className="flex gap-2 mb-4">
+            <input
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyPress={handleKeyPress}
+              placeholder="Add a new task..."
+              className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-black"
+            />
+            <input
+              type="text"
+              value={categoryInput}
+              onChange={(e) => setCategoryInput(e.target.value)}
+              placeholder="Category (optional)"
+              className="w-40 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-black"
+            />
+            <button
+              onClick={addTodo}
+              className="bg-indigo-600 text-white px-6 py-3 rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2"
+            >
+              <Plus size={20} />
+              Add
+            </button>
+          </div>
+
+          <div className="space-y-2 mb-4">
+            {filteredTodos.length === 0 ? (
+              <p className="text-center text-gray-400 py-8">
+                {filterCategory ? 'No tasks in this category' : 'No tasks yet. Add one to get started!'}
+              </p>
+            ) : (
+              filteredTodos.map(todo => {
+                const category = getCategoryForTodo(todo.category_id);
+                const status = todo.status || 'not_started';
+                const statusColors = {
+                  'not_started': 'border-blue-300',
+                  'in_progress': 'border-yellow-300',
+                  'completed': 'border-green-600'
+                };
+                const statusEmojis = {
+                  'not_started': '🔵',
+                  'in_progress': '🟡',
+                  'completed': '🟢'
+                };
+                return (
+                  <div
+                    key={todo.id}
+                    className="flex items-center gap-3 bg-gray-50 p-4 rounded-lg hover:bg-gray-100 transition-colors"
+                  >
+                    <button
+                      onClick={() => cycleStatus(todo.id)}
+                      className={`flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${statusColors[status]} hover:scale-110`}
+                      title={`Status: ${status.replace('_', ' ')}`}
+                    >
+                      <span className="text-xs">{statusEmojis[status]}</span>
+                    </button>
+                    <div className="flex-1">
+                      <span
+                        className={`block ${
+                          todo.is_complete
+                            ? 'line-through text-gray-400'
+                            : 'text-gray-800'
+                        }`}
+                      >
+                        {todo.task}
+                      </span>
+                      {category && (
+                        <span className="text-xs text-gray-500 flex items-center gap-1 mt-1">
+                          <span className={`w-2 h-2 rounded-full ${category.color}`}></span>
+                          {category.name}
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => deleteTodo(todo.id)}
+                      className="text-red-500 hover:text-red-700 transition-colors"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  </div>
+                );
+              })
             )}
           </div>
-          ))
-        )}
-      </div>
 
-      <div className="mt-6 pt-3 sm:pt-4 border-t border-gray-200">
-        <p className="text-xs sm:text-sm text-gray-600 text-center">
-          {todos.filter((t) => !t.is_complete).length} of {todos.length} tasks remaining
-        </p>
+          {completedTodos > 0 && (
+            <button
+              onClick={clearCompleted}
+              className="w-full text-sm text-gray-500 hover:text-gray-700 py-2 hover:bg-gray-50 rounded-lg transition-colors"
+            >
+              Clear completed tasks
+            </button>
+          )}
+
+          <div className="mt-6 pt-6 border-t border-gray-200">
+            <p className="text-xs text-gray-400 text-center">
+              DB Schema: users → todos (user_id FK) | categories → todos (category_id FK)
+            </p>
+          </div>
+        </div>
       </div>
-      </div>
-    </>
+    </div>
   );
 }
