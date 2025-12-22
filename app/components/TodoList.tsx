@@ -3,17 +3,18 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, Check, Loader, Tag, LogOut, User, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import type { User as SupabaseUser } from '@supabase/supabase-js';
 
 export default function TodoList() {
-  const [currentUser, setCurrentUser] = useState(null);
+  const [currentUser, setCurrentUser] = useState<SupabaseUser | null>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loginMode, setLoginMode] = useState('login');
-  const [todos, setTodos] = useState([]);
-  const [categories, setCategories] = useState([]);
+  const [todos, setTodos] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
   const [input, setInput] = useState('');
   const [categoryInput, setCategoryInput] = useState('');
-  const [filterCategory, setFilterCategory] = useState(null);
+  const [filterCategory, setFilterCategory] = useState<number | string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -49,6 +50,8 @@ export default function TodoList() {
   };
 
   const loadUserData = async () => {
+    if (!currentUser) return;
+    
     try {
       setLoading(true);
 
@@ -108,7 +111,8 @@ export default function TodoList() {
       }
     } catch (error) {
       console.error('Auth error:', error);
-      setError(error.message || 'Authentication failed');
+      const errorMessage = error instanceof Error ? error.message : 'Authentication failed';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -130,7 +134,7 @@ export default function TodoList() {
 
   // INSERT INTO todos
   const addTodo = async () => {
-    if (!input.trim()) return;
+    if (!input.trim() || !currentUser) return;
 
     try {
       setSaving(true);
@@ -186,11 +190,14 @@ export default function TodoList() {
     }
   };
 
-  const cycleStatus = async (id) => {
+  const cycleStatus = async (id: number) => {
     try {
       const todo = todos.find(t => t.id === id);
+      if (!todo) return;
+      
       const statusCycle = { 'not_started': 'in_progress', 'in_progress': 'completed', 'completed': 'not_started' };
-      const newStatus = statusCycle[todo.status || 'not_started'];
+      const status = (todo.status || 'not_started') as keyof typeof statusCycle;
+      const newStatus = statusCycle[status];
       const newCompleted = newStatus === 'completed';
 
       const { error } = await supabase
@@ -210,7 +217,7 @@ export default function TodoList() {
     }
   };
 
-  const deleteTodo = async (id) => {
+  const deleteTodo = async (id: number) => {
     try {
       setSaving(true);
       const { error } = await supabase
@@ -230,6 +237,8 @@ export default function TodoList() {
   };
 
   const clearCompleted = async () => {
+    if (!currentUser) return;
+    
     try {
       setSaving(true);
       const { error } = await supabase
@@ -250,7 +259,7 @@ export default function TodoList() {
     }
   };
 
-  const deleteCategory = async (categoryId) => {
+  const deleteCategory = async (categoryId: number) => {
     if (!confirm('Delete this category? Todos will become uncategorized.')) return;
 
     try {
@@ -283,7 +292,7 @@ export default function TodoList() {
     }
   };
 
-  const cleanupEmptyCategories = (currentTodos) => {
+  const cleanupEmptyCategories = (currentTodos: any[]) => {
     const categoriesWithTodos = new Set(currentTodos.map(t => t.category_id).filter(id => id !== null));
     const emptyCategories = categories.filter(cat => !categoriesWithTodos.has(cat.id));
 
@@ -297,7 +306,7 @@ export default function TodoList() {
     }
   };
 
-  const handleKeyPress = (e) => {
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       if (!currentUser) {
         handleAuth();
@@ -307,16 +316,16 @@ export default function TodoList() {
     }
   };
 
-  const getCategoryForTodo = (categoryId) => {
+  const getCategoryForTodo = (categoryId: number | null) => {
     return categories.find(cat => cat.id === categoryId);
   };
 
   // SQL-like aggregate queries
   const activeTodos = todos.filter(t => !t.is_complete).length;
   const completedTodos = todos.filter(t => t.is_complete).length;
-  const todosByCategory = (categoryId) => todos.filter(t => t.category_id === categoryId).length;
+  const todosByCategory = (categoryId: number | null) => todos.filter(t => t.category_id === categoryId).length;
   
-  const getStatusCounts = (categoryId) => {
+  const getStatusCounts = (categoryId: number | null) => {
     const categoryTodos = categoryId ? todos.filter(t => t.category_id === categoryId) : todos;
     return {
       not_started: categoryTodos.filter(t => (t.status || 'not_started') === 'not_started').length,
@@ -558,7 +567,7 @@ export default function TodoList() {
             ) : (
               filteredTodos.map(todo => {
                 const category = getCategoryForTodo(todo.category_id);
-                const status = todo.status || 'not_started';
+                const status = (todo.status || 'not_started') as 'not_started' | 'in_progress' | 'completed';
                 const statusColors = {
                   'not_started': 'border-blue-300',
                   'in_progress': 'border-yellow-300',
