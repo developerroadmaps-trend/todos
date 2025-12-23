@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, Check, Loader, Tag, LogOut, User, X } from 'lucide-react';
+import { Combobox } from '@headlessui/react';
 import { supabase } from '@/lib/supabase';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 
@@ -18,6 +19,15 @@ export default function TodoList() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingText, setEditingText] = useState('');
+
+  // フィルタリングされたカテゴリーを計算
+  const filteredCategories = categoryInput === ''
+    ? categories
+    : categories.filter(cat =>
+        cat.name.toLowerCase().includes(categoryInput.toLowerCase())
+      );
 
   useEffect(() => {
     checkUser();
@@ -141,11 +151,13 @@ export default function TodoList() {
       let categoryId = null;
 
       // Handle category
-      if (categoryInput.trim().length > 0) {
+      if (categoryInput.trim()) {
+        // Check if category already exists
         let category = categories.find(
           cat => cat.name.toLowerCase() === categoryInput.trim().toLowerCase()
         );
-
+        
+        // If category doesn't exist, create it
         if (!category) {
           const colors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-pink-500', 'bg-yellow-500', 'bg-red-500'];
           const { data: newCategory, error: categoryError } = await supabase
@@ -159,11 +171,12 @@ export default function TodoList() {
             .single();
 
           if (categoryError) throw categoryError;
+          category = newCategory;
+          // Update local state with new category
           setCategories([...categories, newCategory]);
-          categoryId = newCategory.id;
-        } else {
-          categoryId = category.id;
         }
+        
+        categoryId = category.id;
       }
 
       const { data: newTodo, error } = await supabase
@@ -184,7 +197,8 @@ export default function TodoList() {
       setCategoryInput('');
     } catch (error) {
       console.error('Error adding todo:', error);
-      setError('Failed to add todo');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to add todo';
+      setError(errorMessage);
     } finally {
       setSaving(false);
     }
@@ -306,13 +320,56 @@ export default function TodoList() {
     }
   };
 
+  const startEditing = (id: number, currentText: string) => {
+    setEditingId(id);
+    setEditingText(currentText);
+  };
+
+  const saveEdit = async (id: number) => {
+    if (!editingText.trim()) {
+      cancelEdit();
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const { error } = await supabase
+        .from('todos')
+        .update({
+          task: editingText.trim(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', id);
+
+      if (error) throw error;
+      setTodos(todos.map(t => t.id === id ? { ...t, task: editingText.trim() } : t));
+      setEditingId(null);
+      setEditingText('');
+    } catch (error) {
+      console.error('Error updating todo:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to update todo';
+      setError(errorMessage);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditingText('');
+  };
+
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
-      if (!currentUser) {
+      if (editingId !== null) {
+        saveEdit(editingId);
+      } else if (!currentUser) {
         handleAuth();
       } else {
         addTodo();
       }
+    } else if (e.key === 'Escape' && editingId !== null) {
+      cancelEdit();
     }
   };
 
@@ -325,8 +382,20 @@ export default function TodoList() {
   const completedTodos = todos.filter(t => t.is_complete).length;
   const todosByCategory = (categoryId: number | null) => todos.filter(t => t.category_id === categoryId).length;
   
-  const getStatusCounts = (categoryId: number | null) => {
-    const categoryTodos = categoryId ? todos.filter(t => t.category_id === categoryId) : todos;
+  const getStatusCounts = (categoryId: number | null | 'uncategorized') => {
+    let categoryTodos;
+    
+    if (categoryId === 'uncategorized') {
+      // Count only todos with no category
+      categoryTodos = todos.filter(t => t.category_id === null);
+    } else if (categoryId) {
+      // Count todos for specific category
+      categoryTodos = todos.filter(t => t.category_id === categoryId);
+    } else {
+      // Count all todos (for overall stats)
+      categoryTodos = todos;
+    }
+    
     return {
       not_started: categoryTodos.filter(t => (t.status || 'not_started') === 'not_started').length,
       in_progress: categoryTodos.filter(t => t.status === 'in_progress').length,
@@ -494,7 +563,7 @@ export default function TodoList() {
                 <span>Uncategorized</span>
               </div>
               <span className={`text-xs mt-0.5 ${filterCategory === 'uncategorized' ? 'text-indigo-100' : 'text-gray-500'}`}>
-                🔵 {getStatusCounts(null).not_started} 🟡 {getStatusCounts(null).in_progress} 🟢 {getStatusCounts(null).completed}
+                🔵 {getStatusCounts('uncategorized').not_started} 🟡 {getStatusCounts('uncategorized').in_progress} 🟢 {getStatusCounts('uncategorized').completed}
               </span>
             </button>
             {categories.map(category => {
@@ -543,13 +612,49 @@ export default function TodoList() {
               placeholder="Add a new task..."
               className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-black"
             />
-            <input
-              type="text"
+            <Combobox
               value={categoryInput}
-              onChange={(e) => setCategoryInput(e.target.value)}
-              placeholder="Category (optional)"
-              className="w-40 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-black"
-            />
+              onChange={setCategoryInput}
+              as="div"
+              className="relative w-40"
+            >
+              <div className="relative">
+                <Combobox.Input
+                  placeholder="Category (optional)"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-black"
+                  onChange={(e) => setCategoryInput(e.target.value)}
+                />
+              </div>
+              {filteredCategories.length > 0 && categoryInput && (
+                <Combobox.Options className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                  {filteredCategories.map(category => (
+                    <Combobox.Option
+                      key={category.id}
+                      value={category.name}
+                      className={({ active }) =>
+                        `cursor-pointer px-4 py-3 flex items-center gap-2 transition-colors ${
+                          active ? 'bg-indigo-500 text-white' : 'text-gray-800 hover:bg-gray-50'
+                        }`
+                      }
+                    >
+                      <span 
+                        className="inline-block w-3 h-3 rounded-full flex-shrink-0" 
+                        style={{ 
+                          backgroundColor: category.color 
+                            .replace('bg-blue-500', '#3b82f6')
+                            .replace('bg-green-500', '#22c55e')
+                            .replace('bg-purple-500', '#a855f7')
+                            .replace('bg-pink-500', '#ec4899')
+                            .replace('bg-yellow-500', '#eab308')
+                            .replace('bg-red-500', '#ef4444')
+                        }}
+                      ></span>
+                      <span>{category.name}</span>
+                    </Combobox.Option>
+                  ))}
+                </Combobox.Options>
+              )}
+            </Combobox>
             <button
               onClick={addTodo}
               className="bg-indigo-600 text-white px-6 py-3 rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2"
@@ -591,15 +696,42 @@ export default function TodoList() {
                       <span className="text-xs">{statusEmojis[status]}</span>
                     </button>
                     <div className="flex-1">
-                      <span
-                        className={`block ${
-                          todo.is_complete
-                            ? 'line-through text-gray-400'
-                            : 'text-gray-800'
-                        }`}
-                      >
-                        {todo.task}
-                      </span>
+                      {editingId === todo.id ? (
+                        <div className="flex gap-2 items-center">
+                          <input
+                            type="text"
+                            value={editingText}
+                            onChange={(e) => setEditingText(e.target.value)}
+                            onKeyPress={handleKeyPress}
+                            autoFocus
+                            className="flex-1 px-2 py-1 border border-indigo-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-black"
+                          />
+                          <button
+                            onClick={() => saveEdit(todo.id)}
+                            disabled={saving}
+                            className="px-2 py-1 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50"
+                          >
+                            {saving ? <Loader size={16} className="animate-spin" /> : <Check size={16} />}
+                          </button>
+                          <button
+                            onClick={cancelEdit}
+                            className="px-2 py-1 bg-gray-400 text-white rounded-lg hover:bg-gray-500"
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
+                      ) : (
+                        <span
+                          onClick={() => startEditing(todo.id, todo.task)}
+                          className={`block cursor-pointer hover:bg-indigo-50 px-2 py-1 rounded transition-colors ${
+                            todo.is_complete
+                              ? 'line-through text-gray-400'
+                              : 'text-gray-800'
+                          }`}
+                        >
+                          {todo.task}
+                        </span>
+                      )}
                       {category && (
                         <span className="text-xs text-gray-500 flex items-center gap-1 mt-1">
                           <span className={`w-2 h-2 rounded-full ${category.color}`}></span>
