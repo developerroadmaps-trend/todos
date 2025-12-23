@@ -614,7 +614,7 @@ export default function TodoList() {
             />
             <Combobox
               value={categoryInput}
-              onChange={setCategoryInput}
+              onChange={(value) => setCategoryInput(value || '')}
               as="div"
               className="relative w-40"
             >
