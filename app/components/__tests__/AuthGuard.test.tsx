@@ -1,27 +1,27 @@
 /**
- * @jest-environment jsdom
+ * @vitest-environment jsdom
  */
-import React from 'react';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import AuthGuard from '../AuthGuard';
 
 // Mock useAuth hook
-const mockUseAuth = jest.fn();
+const mockUseAuth = vi.fn();
 
-jest.mock('@/lib/useAuth', () => ({
+vi.mock('@/lib/useAuth', () => ({
     useAuth: () => mockUseAuth(),
 }));
 
 // Mock AuthForm
-jest.mock('../AuthForm', () => {
-    return function MockAuthForm() {
+vi.mock('../AuthForm', () => ({
+    default: function MockAuthForm() {
         return <div data-testid="auth-form">Auth Form</div>;
-    };
-});
+    },
+}));
 
 describe('AuthGuard', () => {
     beforeEach(() => {
-        jest.clearAllMocks();
+        vi.clearAllMocks();
     });
 
     it('should show loading state when auth is loading', () => {

@@ -1,6 +1,7 @@
 /**
- * @jest-environment jsdom
+ * @vitest-environment jsdom
  */
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useAuth } from '../useAuth';
 
@@ -12,11 +13,11 @@ const mockUser = {
     created_at: '2024-01-01T00:00:00Z',
 };
 
-const mockGetUser = jest.fn();
-const mockSignOut = jest.fn();
-const mockOnAuthStateChange = jest.fn();
+const mockGetUser = vi.fn();
+const mockSignOut = vi.fn();
+const mockOnAuthStateChange = vi.fn();
 
-jest.mock('../supabase', () => ({
+vi.mock('../supabase', () => ({
     supabase: {
         auth: {
             getUser: () => mockGetUser(),
@@ -26,7 +27,7 @@ jest.mock('../supabase', () => ({
                 return {
                     data: {
                         subscription: {
-                            unsubscribe: jest.fn(),
+                            unsubscribe: vi.fn(),
                         },
                     },
                 };
@@ -37,7 +38,7 @@ jest.mock('../supabase', () => ({
 
 describe('useAuth', () => {
     beforeEach(() => {
-        jest.clearAllMocks();
+        vi.clearAllMocks();
         mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
         mockSignOut.mockResolvedValue({ error: null });
     });

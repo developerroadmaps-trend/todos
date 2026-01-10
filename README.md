@@ -1,4 +1,4 @@
-This is a [Next.js](https://nextjs.org) Todo application with [Supabase](https://supabase.com) integration.
+This is a [Remix](https://remix.run) Todo application with [Supabase](https://supabase.com) integration.
 
 ## Getting Started
 
@@ -13,8 +13,8 @@ cp .env.local.example .env.local
 Add your Supabase credentials to `.env.local`:
 
 ```
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+VITE_SUPABASE_URL=your_supabase_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
 
 Get these values from your Supabase project settings.
@@ -33,11 +33,11 @@ pnpm dev
 bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:5173](http://localhost:5173) with your browser to see the result.
 
 ## Project Structure
 
-- `/app` - Next.js App Router pages and components
+- `/app` - Remix routes and components
 - `/app/components/TodoList.tsx` - Main Todo list component with Supabase integration
 - `/lib/supabase.ts` - Supabase client configuration
 - `.env.local.example` - Environment variables template
@@ -49,23 +49,16 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 - 🗄️ Supabase backend integration (ready to connect to database)
 - ⚡ TypeScript support
 
-- ✅ Create, read, update, and delete todos
-- 🎨 Built with Tailwind CSS for responsive design
-- 🗄️ Supabase backend integration (ready to connect to database)
-- ⚡ TypeScript support
-
 ## Learn More
 
-To learn more about Next.js, take a look at the following resources:
+To learn more about Remix, take a look at the following resources:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Remix Documentation](https://remix.run/docs) - learn about Remix features and API.
 - [Supabase Documentation](https://supabase.com/docs) - learn about Supabase backend.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- [React Router](https://reactrouter.com) - understand the routing library powering Remix.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Deploy
 
-## Deploy on Vercel
+The easiest way to deploy your Remix app is to use platforms like [Vercel](https://vercel.com) or [Netlify](https://netlify.com).
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Check out the [Remix deployment documentation](https://remix.run/docs/en/main/start/deploy) for more details.

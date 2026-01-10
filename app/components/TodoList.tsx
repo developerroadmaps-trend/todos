@@ -1,5 +1,3 @@
-'use client';
-
 import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, Check, Loader, Tag, LogOut, User, X } from 'lucide-react';
 import { Combobox } from '@headlessui/react';
@@ -26,8 +24,8 @@ export default function TodoList() {
   const filteredCategories = categoryInput === ''
     ? categories
     : categories.filter(cat =>
-        cat.name.toLowerCase().includes(categoryInput.toLowerCase())
-      );
+      cat.name.toLowerCase().includes(categoryInput.toLowerCase())
+    );
 
   useEffect(() => {
     checkUser();
@@ -61,7 +59,7 @@ export default function TodoList() {
 
   const loadUserData = async () => {
     if (!currentUser) return;
-    
+
     try {
       setLoading(true);
 
@@ -156,7 +154,7 @@ export default function TodoList() {
         let category = categories.find(
           cat => cat.name.toLowerCase() === categoryInput.trim().toLowerCase()
         );
-        
+
         // If category doesn't exist, create it
         if (!category) {
           const colors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-pink-500', 'bg-yellow-500', 'bg-red-500'];
@@ -175,7 +173,7 @@ export default function TodoList() {
           // Update local state with new category
           setCategories([...categories, newCategory]);
         }
-        
+
         categoryId = category.id;
       }
 
@@ -208,7 +206,7 @@ export default function TodoList() {
     try {
       const todo = todos.find(t => t.id === id);
       if (!todo) return;
-      
+
       const statusCycle = { 'not_started': 'in_progress', 'in_progress': 'completed', 'completed': 'not_started' };
       const status = (todo.status || 'not_started') as keyof typeof statusCycle;
       const newStatus = statusCycle[status];
@@ -252,7 +250,7 @@ export default function TodoList() {
 
   const clearCompleted = async () => {
     if (!currentUser) return;
-    
+
     try {
       setSaving(true);
       const { error } = await supabase
@@ -381,10 +379,10 @@ export default function TodoList() {
   const activeTodos = todos.filter(t => !t.is_complete).length;
   const completedTodos = todos.filter(t => t.is_complete).length;
   const todosByCategory = (categoryId: number | null) => todos.filter(t => t.category_id === categoryId).length;
-  
+
   const getStatusCounts = (categoryId: number | null | 'uncategorized') => {
     let categoryTodos;
-    
+
     if (categoryId === 'uncategorized') {
       // Count only todos with no category
       categoryTodos = todos.filter(t => t.category_id === null);
@@ -395,20 +393,20 @@ export default function TodoList() {
       // Count all todos (for overall stats)
       categoryTodos = todos;
     }
-    
+
     return {
       not_started: categoryTodos.filter(t => (t.status || 'not_started') === 'not_started').length,
       in_progress: categoryTodos.filter(t => t.status === 'in_progress').length,
       completed: categoryTodos.filter(t => (t.status === 'completed' || t.is_complete)).length
     };
   };
-  
+
   // Filter todos based on selected category
   const filteredTodos = filterCategory === 'uncategorized'
     ? todos.filter(t => t.category_id === null)
-    : filterCategory 
-    ? todos.filter(t => t.category_id === filterCategory)
-    : todos;
+    : filterCategory
+      ? todos.filter(t => t.category_id === filterCategory)
+      : todos;
 
   // Login/Signup Screen
   if (!currentUser) {
@@ -427,21 +425,19 @@ export default function TodoList() {
             <div className="flex gap-2 mb-4">
               <button
                 onClick={() => setLoginMode('login')}
-                className={`flex-1 py-2 rounded-lg font-medium transition-colors ${
-                  loginMode === 'login'
+                className={`flex-1 py-2 rounded-lg font-medium transition-colors ${loginMode === 'login'
                     ? 'bg-indigo-600 text-white'
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
+                  }`}
               >
                 Login
               </button>
               <button
                 onClick={() => setLoginMode('signup')}
-                className={`flex-1 py-2 rounded-lg font-medium transition-colors ${
-                  loginMode === 'signup'
+                className={`flex-1 py-2 rounded-lg font-medium transition-colors ${loginMode === 'signup'
                     ? 'bg-indigo-600 text-white'
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
+                  }`}
               >
                 Sign Up
               </button>
@@ -540,26 +536,23 @@ export default function TodoList() {
           <div className="mb-4 flex gap-2 flex-wrap">
             <button
               onClick={() => setFilterCategory(null)}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all ${
-                filterCategory === null
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all ${filterCategory === null
                   ? 'bg-indigo-600 text-white'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
+                }`}
             >
               All ({todos.length})
             </button>
             <button
               onClick={() => setFilterCategory('uncategorized')}
-              className={`flex flex-col items-start px-3 py-1.5 rounded-lg text-sm transition-all ${
-                filterCategory === 'uncategorized'
+              className={`flex flex-col items-start px-3 py-1.5 rounded-lg text-sm transition-all ${filterCategory === 'uncategorized'
                   ? 'bg-indigo-600 text-white'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
+                }`}
             >
               <div className="flex items-center gap-2">
-                <span className={`w-2 h-2 rounded-full ${
-                  filterCategory === 'uncategorized' ? 'bg-white' : 'bg-gray-400'
-                }`}></span>
+                <span className={`w-2 h-2 rounded-full ${filterCategory === 'uncategorized' ? 'bg-white' : 'bg-gray-400'
+                  }`}></span>
                 <span>Uncategorized</span>
               </div>
               <span className={`text-xs mt-0.5 ${filterCategory === 'uncategorized' ? 'text-indigo-100' : 'text-gray-500'}`}>
@@ -572,16 +565,14 @@ export default function TodoList() {
                 <div key={category.id} className="relative group">
                   <button
                     onClick={() => setFilterCategory(category.id)}
-                    className={`flex flex-col items-start px-3 py-1.5 rounded-lg text-sm transition-all ${
-                      filterCategory === category.id
+                    className={`flex flex-col items-start px-3 py-1.5 rounded-lg text-sm transition-all ${filterCategory === category.id
                         ? 'bg-indigo-600 text-white'
                         : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
+                      }`}
                   >
                     <div className="flex items-center gap-2">
-                      <span className={`w-2 h-2 rounded-full ${
-                        filterCategory === category.id ? 'bg-white' : category.color
-                      }`}></span>
+                      <span className={`w-2 h-2 rounded-full ${filterCategory === category.id ? 'bg-white' : category.color
+                        }`}></span>
                       <span>{category.name}</span>
                     </div>
                     <span className={`text-xs mt-0.5 ${filterCategory === category.id ? 'text-indigo-100' : 'text-gray-500'}`}>
@@ -602,7 +593,7 @@ export default function TodoList() {
               );
             })}
           </div>
-          
+
           <div className="flex gap-2 mb-4">
             <input
               type="text"
@@ -632,15 +623,14 @@ export default function TodoList() {
                       key={category.id}
                       value={category.name}
                       className={({ active }) =>
-                        `cursor-pointer px-4 py-3 flex items-center gap-2 transition-colors ${
-                          active ? 'bg-indigo-500 text-white' : 'text-gray-800 hover:bg-gray-50'
+                        `cursor-pointer px-4 py-3 flex items-center gap-2 transition-colors ${active ? 'bg-indigo-500 text-white' : 'text-gray-800 hover:bg-gray-50'
                         }`
                       }
                     >
-                      <span 
-                        className="inline-block w-3 h-3 rounded-full flex-shrink-0" 
-                        style={{ 
-                          backgroundColor: category.color 
+                      <span
+                        className="inline-block w-3 h-3 rounded-full flex-shrink-0"
+                        style={{
+                          backgroundColor: category.color
                             .replace('bg-blue-500', '#3b82f6')
                             .replace('bg-green-500', '#22c55e')
                             .replace('bg-purple-500', '#a855f7')
@@ -723,11 +713,10 @@ export default function TodoList() {
                       ) : (
                         <span
                           onClick={() => startEditing(todo.id, todo.task)}
-                          className={`block cursor-pointer hover:bg-indigo-50 px-2 py-1 rounded transition-colors ${
-                            todo.is_complete
+                          className={`block cursor-pointer hover:bg-indigo-50 px-2 py-1 rounded transition-colors ${todo.is_complete
                               ? 'line-through text-gray-400'
                               : 'text-gray-800'
-                          }`}
+                            }`}
                         >
                           {todo.task}
                         </span>

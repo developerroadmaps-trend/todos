@@ -1,28 +1,31 @@
 /**
- * @jest-environment jsdom
+ * @vitest-environment jsdom
  */
-import React from 'react';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import AuthForm from '../AuthForm';
 
 // Mock Supabase
-const mockSignInWithPassword = jest.fn();
-const mockSignUp = jest.fn();
+const mockSignInWithPassword = vi.fn();
+const mockSignUp = vi.fn();
+const mockResetPasswordForEmail = vi.fn();
 
-jest.mock('@/lib/supabase', () => ({
+vi.mock('@/lib/supabase', () => ({
     supabase: {
         auth: {
             signInWithPassword: (params: any) => mockSignInWithPassword(params),
             signUp: (params: any) => mockSignUp(params),
+            resetPasswordForEmail: (email: string, options: any) => mockResetPasswordForEmail(email, options),
         },
     },
 }));
 
 describe('AuthForm', () => {
     beforeEach(() => {
-        jest.clearAllMocks();
+        vi.clearAllMocks();
         mockSignInWithPassword.mockResolvedValue({ error: null });
         mockSignUp.mockResolvedValue({ error: null });
+        mockResetPasswordForEmail.mockResolvedValue({ error: null });
     });
 
     it('should render sign-in form by default', () => {
@@ -33,6 +36,7 @@ describe('AuthForm', () => {
         expect(screen.getByLabelText('Password')).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Sign In' })).toBeInTheDocument();
         expect(screen.getByText("Don't have an account?")).toBeInTheDocument();
+        expect(screen.getByText("Forgot Password?")).toBeInTheDocument();
     });
 
     it('should toggle to sign-up mode when clicking Sign Up link', () => {
@@ -42,6 +46,7 @@ describe('AuthForm', () => {
 
         expect(screen.getByRole('button', { name: 'Sign Up' })).toBeInTheDocument();
         expect(screen.getByText('Already have an account?')).toBeInTheDocument();
+        expect(screen.queryByText("Forgot Password?")).not.toBeInTheDocument();
     });
 
     it('should toggle back to sign-in mode', () => {
@@ -53,6 +58,31 @@ describe('AuthForm', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Sign In' }));
 
         expect(screen.getByText("Don't have an account?")).toBeInTheDocument();
+        expect(screen.getByText("Forgot Password?")).toBeInTheDocument();
+    });
+
+    it('should toggle to forgot password mode', () => {
+        render(<AuthForm />);
+
+        fireEvent.click(screen.getByText("Forgot Password?"));
+
+        expect(screen.getByText('Reset Password')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Send Reset Link' })).toBeInTheDocument();
+        expect(screen.getByText("Back to Sign In")).toBeInTheDocument();
+        expect(screen.queryByLabelText('Password')).not.toBeInTheDocument();
+    });
+
+    it('should call resetPasswordForEmail on reset submit', async () => {
+        render(<AuthForm />);
+
+        fireEvent.click(screen.getByText("Forgot Password?"));
+        fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'reset@example.com' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Send Reset Link' }));
+
+        expect(mockResetPasswordForEmail).toHaveBeenCalledWith(
+            'reset@example.com',
+            expect.objectContaining({ redirectTo: expect.stringContaining('/') })
+        );
     });
 
     it('should call signInWithPassword on sign in submit', async () => {

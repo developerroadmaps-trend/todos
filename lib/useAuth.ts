@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { User } from '@supabase/supabase-js';
+import type { User } from '@supabase/supabase-js';
 import { supabase } from './supabase';
 
 export interface AuthUser extends User {
@@ -17,11 +17,11 @@ export function useAuth() {
       try {
         setLoading(true);
         const { data: { user }, error } = await supabase.auth.getUser();
-        
+
         if (error) {
           throw error;
         }
-        
+
         if (user) {
           setUser(user as AuthUser);
         } else {
