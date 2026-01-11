@@ -1,4 +1,4 @@
-This is a [Remix](https://remix.run) Todo application with [Supabase](https://supabase.com) integration.
+This is a [React Router v7](https://reactrouter.com) Todo application with [Supabase](https://supabase.com) integration.
 
 ## Getting Started
 

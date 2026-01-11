@@ -39,17 +39,20 @@ export default function AuthForm() {
         setEmail('');
         setPassword('');
       } else if (mode === 'forgot_password') {
-        const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: typeof window !== 'undefined' ? `${window.location.origin}/` : undefined,
-        });
+        const { error } = await supabase.auth.resetPasswordForEmail(email);
 
         if (error) throw error;
         setMessage('Password reset link sent! Please check your email.');
         setEmail('');
       }
     } catch (err) {
+      console.error('Auth error:', err);
       const errorMessage = err instanceof Error ? err.message : 'An error occurred';
-      setError(errorMessage);
+      if (errorMessage === 'Load failed' || errorMessage === 'Failed to fetch') {
+        setError('Network error: Unable to connect to Supabase. Check your connection or Project URL.');
+      } else {
+        setError(errorMessage);
+      }
     } finally {
       setLoading(false);
     }

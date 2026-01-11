@@ -15,7 +15,7 @@ vi.mock('@/lib/supabase', () => ({
         auth: {
             signInWithPassword: (params: any) => mockSignInWithPassword(params),
             signUp: (params: any) => mockSignUp(params),
-            resetPasswordForEmail: (email: string, options: any) => mockResetPasswordForEmail(email, options),
+            resetPasswordForEmail: (...args: any[]) => mockResetPasswordForEmail(...args),
         },
     },
 }));
@@ -79,10 +79,7 @@ describe('AuthForm', () => {
         fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'reset@example.com' } });
         fireEvent.click(screen.getByRole('button', { name: 'Send Reset Link' }));
 
-        expect(mockResetPasswordForEmail).toHaveBeenCalledWith(
-            'reset@example.com',
-            expect.objectContaining({ redirectTo: expect.stringContaining('/') })
-        );
+        expect(mockResetPasswordForEmail).toHaveBeenCalledWith('reset@example.com');
     });
 
     it('should call signInWithPassword on sign in submit', async () => {
